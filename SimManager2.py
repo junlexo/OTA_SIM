@@ -75,7 +75,7 @@ class SimManager(threading.Thread):
                     self._onEjectSim()
                     break
                 #SMS check
-                elif value.find("CMTI"):
+                elif value.find("CMTI") != -1:
                     print("DEBUG___Received new Message")
                     smsindex = sms.read_index(value)
                     smscontent = self.read_SMS(smsindex[1])
@@ -165,11 +165,8 @@ class SimThread (threading.Thread):
                 while True:
                     result = ""
                     lastRead = self._recv()
-                    
-                    if lastRead.find("CMTI") != -1:
-                        print("DEBUG___receive SMS-------------------")
-                    if lastRead != "":
-                        print("    replied")
+                    if lastRead == command.rstrip():
+                        print("                     replied")
                         result = lastRead
                         lastRead = self._recv()
                         # read until command is end
@@ -180,6 +177,7 @@ class SimThread (threading.Thread):
                             result += lastRead
                             lastRead = self._recv()
                             time.sleep(0.1)
+                            print("DEBUG___")
                         self.readQueue.put(result)
                         break
                     else:
@@ -204,7 +202,7 @@ class SimThread (threading.Thread):
 
     def _recv(self):
         s = self.ser.readline()
-        data = s.decode("utf-8")
+        data = s.decode()   #'utf-8'
         data = data.rstrip()
         print("    < ", data)
         return data

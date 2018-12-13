@@ -14,6 +14,7 @@ import boto3
 import os
 import sys
 from OTA import DownloadSource
+
 #from dotenv import Dotenv
 #dotenv = Dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 #os.environ.update(dotenv)
@@ -65,6 +66,7 @@ def run(simManager):
     sd.connect()
     print('DEBUG___inited sender')
     sms = simManager.read("AT+CMGR=12\r\n")
+    # sms = converter.pdu_to_text(sms.replace("AT+CMGR=12+CMGR: 1,,100", ""))
     print('DEBUG___Receive OTA SMS success : ', sms)
     log(idicc)
     # send data
@@ -117,6 +119,9 @@ def doWhile(ser1, code):
     ser1.flush()
     time.sleep(1)
     response1 =  ser1.readline().decode()
+    print(response1)
+    ser1.flush()
+    time.sleep(0.1)
     #print(response1)
     #if response1 == 'OK\n':
     #    break
@@ -126,17 +131,26 @@ def _onload():
         data_json = json.load(jsonFile)
         jsonFile.close()  # Close the JSON file
     print("----------SOFTWARE VERSION: ", data_json["software_version"])
+    print('DEBUG__Power ON Init')
     ser1 = serial.Serial('/dev/ttyS0', 9600, timeout = 1)
+    print('DEBUG__AT')
     doWhile(ser1, "AT\r\n")
+    print('DEBUG__AT+CNSMOD=1')
     doWhile(ser1, "AT+CNSMOD=1\r\n")
+    print('DEBUG__AT+CMNB=1')
     doWhile(ser1, "AT+CMNB=1\r\n")
+    print('DEBUG__AT+CAPNMODE=1')
     doWhile(ser1, "AT+CAPNMODE=1\r\n")
+    print('DEBUG__AT+CNACT=1')
     doWhile(ser1, "AT+CNACT=1,\""+data_json["APN_name"]+"\"\r\n")
+    print('DEBUG__AT+CNMI=2,1')
     doWhile(ser1, "AT+CNMI=2,1\r\n")
+    print('DEBUG__AT+CMGF=1')
     doWhile(ser1, "AT+CMGF=1\r\n")
     #doWhile(ser1, "AT+CMGL=\"REC UNREAD\"\r\n")
     ser1.close()
-    
+    print("DEBUG___MAIN___onload finish")
+
 if __name__ == '__main__':    
     _onload()
     while True:
@@ -150,7 +164,7 @@ if __name__ == '__main__':
             while not ready:
                 simStateChange()
                 print("DEBUG___sim not ready yet, change state")
-                time.sleep(1)
+                time.sleep(2)
             run(sm)
             sm.stop()
             flag_ = False    
