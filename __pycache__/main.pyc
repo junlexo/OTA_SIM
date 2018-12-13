@@ -1,0 +1,128 @@
+#!/usr/bin/python3
+import time
+import serial
+import certificate
+import sensor
+import sender
+import subprocess
+from config import Config
+from libs import file
+import json
+from SimManager2 import SimManager
+import queue
+import boto3
+import os
+#from dotenv import Dotenv
+#dotenv = Dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+#os.environ.update(dotenv)
+
+SerialBaud = 9600
+
+ser = serial.Serial(
+            port='/dev/ttyS0',
+            baudrate=9600,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+            timeout=1
+        )
+
+exitFlag = False
+simReady = queue.Queue(1)
+ready = False
+isInit = False
+
+def run(simManager):
+    # load iccid
+    print("get sim iccid")
+    idicc = simManager.read("AT+CCID\r\n")
+    print('get iccid success', idicc)
+    
+    # load certificate
+    print("load ca, path")
+    cert = certificate.Certificate(
+        idicc, Config.get("api_key"), Config.get("gateway_token"), Config.get("end_point"))
+    if cert.isExisted():
+        print('ca, key available')
+    else:
+        print("Cannot locate ca and key files")
+
+    print("init sensor")
+    ss = sensor.Sensor(Config.get("sensor").get(
+        "pin"), Config.get("sensor").get("type"))
+    print("sensor pin, type", Config.get("sensor").get(
+        "pin"), Config.get("sensor").get("type"))
+
+    awsConf = json.loads(file.load("./keys/"+idicc+".json"))
+    print('init sender')
+    sd = sender.Sender("./keys/rootca.crt", "./keys/"+idicc +
+                       ".crt", "./keys/"+idicc+".key",  awsConf.get("topic"), awsConf.get("endpoint"), int(awsConf.get("port")))
+    sd.connect()
+    print('inited sender')
+
+    log(idicc)
+    # send data
+    while ready:
+        simStateChange()
+        newData = ss.get()
+        newData["ICCID"] = idicc
+        newData["location"] = "demo"
+        newData = json.dumps(newData)
+        sd.send(newData)
+        time.sleep(Config.get("send_interval"))
+
+
+def simStateChange():
+    global ready
+    print("ok?", ready)
+    if not simReady.empty():
+        simReady.get()
+        ready = not ready
+
+
+def log(iccid):
+    dynamodb = boto3.resource('dynamodb', region_name="ap-southeast-1")
+
+    sensor_log_table = dynamodb.Table('dev_sensor_logs')
+    timestamp = int(time.time() * 1000)
+    log = " " + iccid + " is online"
+    sensor_log_table.put_item(Item={
+        'sensor_id': iccid,
+        'timestamp': timestamp,
+        'log': log
+    })
+def doWhile(ser1, code):
+    while True:
+        print(code)
+        ser1.write(code.encode())
+        ser1.flush()
+        #time.sleep(1)
+        response1 =  ser1.readline().decode()
+        print(response1)
+        if response1 == 'OK\n':
+            break
+            
+def _onload():
+    ser1 = serial.Serial('/dev/ttyS0', 9600)
+    doWhile(ser1, "AT\r\n")
+    doWhile(ser1, "AT+CNSMOD=1\r\n")
+    doWhile(ser1, "AT+CMNB=1\r\n")
+    doWhile(ser1, "AT+CAPNMODE=1\r\n")
+    doWhile(ser1, "AT+CNACT=1,\"m-i090\"\r\n")
+    ser1.close()
+    
+if __name__ == '__main__':
+    print("active sim")
+    _onload()
+        
+    global ready
+    sm = SimManager("sim manager", simReady)
+    sm.start()
+    
+    while True:
+        print("is sim ready")
+        while not ready:
+            simStateChange()
+            print("sim not ready yet")
+            time.sleep(1)
+        run(sm)

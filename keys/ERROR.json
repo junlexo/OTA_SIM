@@ -1,0 +1,1 @@
+{"topic": "$aws/things/singtel-starter-kit/shadow/update", "endpoint": "a1zmup1beu3ree.iot.ap-southeast-1.amazonaws.com", "crt": "http://s3-ap-southeast-1.amazonaws.com/dev-singtel-jitr-certificates/ERROR.crt", "key": "http://s3-ap-southeast-1.amazonaws.com/dev-singtel-jitr-certificates/ERROR.key", "port": "8883"}
