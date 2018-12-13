@@ -38,6 +38,7 @@ def run(simManager):
     # load iccid
     print("DEBUG___get sim iccid")
     idicc = simManager.read("AT+CCID\r\n")    
+    # if iccid.find("AT+CCID") != -1:    
     idicc = idicc.replace("AT+CCID","")
     print('DEBUG___get iccid success : ', idicc)
     with open("env.json", "r+") as jsonFile:
